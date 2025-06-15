@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard Admin - Pajakin</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="css/style.css">
+    
+        <style>
+            .admin-nav {
+                background-color: #0d6efd !important; 
+            }
+        </style>
+    </head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark admin-nav shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-lock"></i> Dashboard Administrator</a>
+            <a href="index.html" class="btn btn-outline-light">Logout</a>
+        </div>
+    </nav>
+
+    <main class="dashboard-container container">
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card p-3 kpi-card">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-success text-white"><i class="bi bi-cash-stack fs-2"></i></div>
+                        <div><p class="kpi-title">Total Pajak Terkumpul</p><h4 class="kpi-value" id="kpi-total-pajak">Rp 0</h4></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3 kpi-card">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-info text-white"><i class="bi bi-receipt-cutoff fs-2"></i></div>
+                        <div><p class="kpi-title">Jumlah Transaksi</p><h4 class="kpi-value" id="kpi-jumlah-transaksi">0</h4></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3 kpi-card">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-warning text-dark"><i class="bi bi-percent fs-2"></i></div>
+                        <div><p class="kpi-title">Tarif Pajak Saat Ini</p><h4 class="kpi-value" id="kpi-tarif-pajak">0.5%</h4></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="card p-4 mb-4">
+                    <h5 class="card-title fw-bold mb-3">Tren Penerimaan Pajak</h5>
+                    <div id="tren-pajak-card" class="trend-card">
+                        <div class="trend-text">
+                            <h6>vs Bulan Lalu</h6>
+                            <span class="percentage" id="tren-persentase">Memuat...</span>
+                        </div>
+                        <div class="trend-icon" id="tren-ikon">
+                            <i class="bi bi-arrow-right-circle-fill text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card p-4">
+                     <h5 class="card-title fw-bold">Pengaturan Tarif</h5>
+                     <form id="form-tarif-pajak">
+                        <div class="input-group">
+                            <input type="number" step="0.01" class="form-control" id="tarif-pajak">
+                            <span class="input-group-text">%</span>
+                            <button class="btn btn-danger" type="submit">Simpan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="col-lg-7">
+                <div class="card p-4">
+                    <h5 class="card-title fw-bold mb-3">Aktivitas Terbaru</h5>
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-sm">
+                            <thead>
+                                <tr><th>Wajib Pajak</th><th>Nominal</th></tr>
+                            </thead>
+                            <tbody id="tabel-aktivitas-body">
+                                <tr><td colspan="2" class="text-center text-muted">Belum ada aktivitas.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Fungsi untuk mengelola data di localStorage ---
+            function getPaymentData() {
+                const data = localStorage.getItem('pajakinData');
+                return data ? JSON.parse(data) : [];
+            }
+            
+            // --- Fungsi untuk memuat semua data ke dashboard ---
+            function loadDashboardData() {
+                const allData = getPaymentData();
+                const tarifPajak = localStorage.getItem('tarifPajakUMKM') || '0.5';
+
+                // 1. Update KPI
+                const totalPajak = allData.reduce((sum, item) => sum + item.nominal, 0);
+                document.getElementById('kpi-total-pajak').innerText = `Rp ${totalPajak.toLocaleString('id-ID')}`;
+                document.getElementById('kpi-jumlah-transaksi').innerText = allData.length;
+                document.getElementById('kpi-tarif-pajak').innerText = `${tarifPajak}%`;
+
+                // 2. Update Indikator Tren
+                updateTrendIndicator(allData);
+
+                // 3. Update Tabel Aktivitas Terbaru (ambil 4 data terakhir)
+                const tabelAktivitasBody = document.getElementById('tabel-aktivitas-body');
+                tabelAktivitasBody.innerHTML = '';
+                if (allData.length > 0) {
+                    allData.slice(0, 4).forEach(item => {
+                        const tanggalFormatted = new Date(item.tanggal).toLocaleDateString('id-ID', {day:'2-digit', month:'short'});
+                        tabelAktivitasBody.innerHTML += `
+                            <tr>
+                                <td>
+                                    <strong class="d-block">${item.namaToko}</strong>
+                                    <small class="text-muted">${item.noHp || 'No HP tidak ada'} - ${tanggalFormatted}</small>
+                                </td>
+                                <td class="text-end fw-bold text-success">+Rp ${item.nominal.toLocaleString('id-ID')}</td>
+                            </tr>`;
+                    });
+                } else {
+                    tabelAktivitasBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">Belum ada aktivitas.</td></tr>';
+                }
+                
+                // 4. Update Form Tarif
+                document.getElementById('tarif-pajak').value = tarifPajak;
+            }
+
+            // --- Fungsi untuk menghitung dan menampilkan tren ---
+            function updateTrendIndicator(data) {
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                
+                const prevMonthDate = new Date(new Date().setMonth(currentMonth - 1));
+                const prevMonth = prevMonthDate.getMonth();
+                const prevMonthYear = prevMonthDate.getFullYear();
+
+                const totalBulanIni = data.filter(item => { const d = new Date(item.tanggal); return d.getMonth() === currentMonth && d.getFullYear() === currentYear; }).reduce((sum, item) => sum + item.nominal, 0);
+                const totalBulanLalu = data.filter(item => { const d = new Date(item.tanggal); return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear; }).reduce((sum, item) => sum + item.nominal, 0);
+                
+                const trenPersenEl = document.getElementById('tren-persentase');
+                const trenIkonEl = document.getElementById('tren-ikon');
+
+                if (totalBulanLalu === 0 && totalBulanIni > 0) {
+                    trenPersenEl.innerText = `+100%`;
+                    trenPersenEl.className = 'percentage text-success';
+                    trenIkonEl.innerHTML = '<i class="bi bi-arrow-up-circle-fill text-success"></i>';
+                    return;
+                }
+                if (totalBulanLalu === 0 && totalBulanIni === 0) {
+                    trenPersenEl.innerText = '0%';
+                    trenPersenEl.className = 'percentage text-muted';
+                    trenIkonEl.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-muted"></i>';
+                    return;
+                }
+
+                const percentageChange = ((totalBulanIni - totalBulanLalu) / totalBulanLalu) * 100;
+
+                if (percentageChange > 0) {
+                    trenPersenEl.innerText = `+${percentageChange.toFixed(1)}%`;
+                    trenPersenEl.className = 'percentage text-success';
+                    trenIkonEl.innerHTML = '<i class="bi bi-arrow-up-circle-fill text-success"></i>';
+                } else if (percentageChange < 0) {
+                    trenPersenEl.innerText = `${percentageChange.toFixed(1)}%`;
+                    trenPersenEl.className = 'percentage text-danger';
+                    trenIkonEl.innerHTML = '<i class="bi bi-arrow-down-circle-fill text-danger"></i>';
+                } else {
+                    trenPersenEl.innerText = '0%';
+                    trenPersenEl.className = 'percentage text-muted';
+                    trenIkonEl.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-muted"></i>';
+                }
+            }
+
+            const formTarif = document.getElementById('form-tarif-pajak');
+            formTarif.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const newTarif = document.getElementById('tarif-pajak').value;
+                localStorage.setItem('tarifPajakUMKM', newTarif);
+                alert(`Tarif berhasil disimpan menjadi ${newTarif}%`);
+                loadDashboardData();
+            });
+            
+            loadDashboardData();
+            window.addEventListener('storage', loadDashboardData);      
+
+        });
+    </script>
+</body>
+</html>
